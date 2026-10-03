@@ -1,0 +1,58 @@
+# =========================================================
+# Конфигурация предиктивного автоскейлера
+# =========================================================
+
+prometheus:
+  # URL Prometheus (можно использовать Data Source, к которому
+  # обращается Grafana - обычно это тот же Prometheus).
+  # В кластере k8s чаще всего выглядит так:
+  url: "http://prometheus.monitoring.svc.cluster.local:9090"
+  timeout_seconds: 10
+
+poller:
+  # Как часто (в секундах) опрашивать метрики и пересчитывать прогноз
+  interval_seconds: 60
+  # Сколько исторических данных тянуть из Prometheus для обучения модели
+  history_window_minutes: 120
+  # Шаг дискретизации временного ряда при опросе Prometheus
+  step_seconds: 30
+  # На сколько минут вперёд строить прогноз нагрузки
+  forecast_horizon_minutes: 10
+
+scaling:
+  # Минимальный промежуток между двумя изменениями реплик ОДНОГО сервиса
+  # (защита от "дребезга" / flapping)
+  cooldown_seconds: 180
+  # Ограничение на изменение количества реплик за одну итерацию
+  scale_up_step_limit: 4
+  scale_down_step_limit: 2
+
+services:
+  - name: "orders-service"
+    namespace: "default"
+    deployment: "orders-service"
+    # PromQL-запрос, возвращающий метрику нагрузки (например, RPS)
+    query: 'sum(rate(http_requests_total{app="orders-service"}[2m]))'
+    # Целевая нагрузка на одну реплику (единицы метрики выше на 1 под)
+    target_per_replica: 50
+    min_replicas: 2
+    max_replicas: 20
+    # --- Параметры единственного алгоритма прогнозирования (ARAF) ---
+    alpha: 0.3          # скорость адаптации уровня (0..1)
+    beta: 0.1           # скорость адаптации тренда (0..1)
+    lambda_plus: 0.5    # скорость роста риск-margin при недооценке нагрузки
+    lambda_minus: 0.05  # скорость затухания риск-margin при переоценке
+    kappa: 1.2          # вес риск-поправки, ~ C_недооценки / C_избыточной_реплики
+
+  - name: "payments-service"
+    namespace: "default"
+    deployment: "payments-service"
+    query: 'sum(rate(http_requests_total{app="payments-service"}[2m]))'
+    target_per_replica: 30
+    min_replicas: 1
+    max_replicas: 10
+    alpha: 0.3
+    beta: 0.1
+    lambda_plus: 0.5
+    lambda_minus: 0.05
+    kappa: 0.8

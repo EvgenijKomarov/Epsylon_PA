@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: predictive-autoscaler-config
+  namespace: default
+data:
+  config.yaml: |
+    prometheus:
+      url: "http://prometheus.monitoring.svc.cluster.local:9090"
+      timeout_seconds: 10
+    poller:
+      interval_seconds: 60
+      history_window_minutes: 120
+      step_seconds: 30
+      forecast_horizon_minutes: 10
+    scaling:
+      cooldown_seconds: 180
+      scale_up_step_limit: 4
+      scale_down_step_limit: 2
+    services:
+      - name: "orders-service"
+        namespace: "default"
+        deployment: "orders-service"
+        query: 'sum(rate(http_requests_total{app="orders-service"}[2m]))'
+        target_per_replica: 50
+        min_replicas: 2
+        max_replicas: 20
+        forecast_model: "holt_winters"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: predictive-autoscaler
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: predictive-autoscaler
+  template:
+    metadata:
+      labels:
+        app: predictive-autoscaler
+    spec:
+      serviceAccountName: predictive-autoscaler
+      containers:
+        - name: predictive-autoscaler
+          image: predictive-autoscaler:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: config
+          configMap:
+            name: predictive-autoscaler-config
