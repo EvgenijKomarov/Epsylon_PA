@@ -1,4 +1,4 @@
-# Predictive Autoscaler для микросервисов в Kubernetes
+# Epsylon_PA для микросервисов в Kubernetes
 
 Программа опрашивает Prometheus (источник данных Grafana), строит
 прогноз нагрузки методами анализа временных рядов и заранее (до того,
@@ -84,7 +84,7 @@ python -m autoscaler.main --config config.yaml --dry-run -v
 ## Запуск в кластере
 
 ```bash
-docker build -t predictive-autoscaler:latest .
+docker build -t epsylon-pa:latest .
 kubectl apply -f k8s/rbac.yaml
 kubectl apply -f k8s/deployment.yaml
 ```
@@ -102,22 +102,3 @@ python -m pytest tests/
 
 Тесты охватывают все основные модули приложения:
 - `tests/test_autoscaler.py` - Тесты для forecaster.py, decision.py и metrics_collector.py
-
-## Идеи для расширения (раздел "научная новизна" в дипломе)
-
-1. **Эмпирическое сравнение с baseline** — прогнать ARAF против
-   штатного HPA и против симметричного Holt (kappa=0) на одних и тех же
-   исторических данных, сравнить не только MAPE/RMSE, но и % нарушений
-   SLA и переиспользование ресурсов — это и есть материал для главы
-   с результатами эксперимента.
-2. **Обоснование kappa через реальные затраты** — вывести коэффициент
-   `kappa` из фактической стоимости пода в вашем кластере/облаке и
-   оценки потерь от деградации сервиса (SLA-штрафы, потерянные
-   транзакции), а не задавать его вручную.
-3. **Метрики самого автоскейлера** — экспортировать в Prometheus
-   `base_forecast`, `risk_margin`, `corrected_forecast` через
-   `prometheus_client`, чтобы визуализировать поведение алгоритма в
-   отдельном дашборде Grafana — наглядно для защиты.
-4. **Custom Metrics API / kube-controller** — оформить логику как
-   полноценный Kubernetes-контроллер (kopf/kubebuilder-style) вместо
-   отдельного pod-приложения, работающего поверх Deployment API.
